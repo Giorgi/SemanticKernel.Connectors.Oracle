@@ -1,6 +1,4 @@
-﻿using System.Numerics;
-
-namespace SemanticKernel.Connectors.Oracle;
+﻿namespace SemanticKernel.Connectors.Oracle;
 
 /// <summary>
 /// An oracle memory entry.

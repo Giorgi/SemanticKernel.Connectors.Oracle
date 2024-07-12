@@ -1,9 +1,9 @@
-﻿using System.Runtime.CompilerServices;
-using Oracle.ManagedDataAccess.Client;
+﻿using Oracle.ManagedDataAccess.Client;
+using System.Runtime.CompilerServices;
 
 namespace SemanticKernel.Connectors.Oracle;
 
-class OracleDatabase(OracleConnection oracleConnection, int vectorSize, bool ownsConnection = false) : IDisposable
+internal class OracleDatabase(OracleConnection oracleConnection, int vectorSize, bool ownsConnection = false) : IDisposable
 {
     private readonly int vectorSize = vectorSize;
 
@@ -48,12 +48,17 @@ class OracleDatabase(OracleConnection oracleConnection, int vectorSize, bool own
         throw new NotImplementedException();
     }
 
-    public IAsyncEnumerable<OracleMemoryEntry> ReadBatchAsync(string collectionName, IEnumerable<string> keys, bool withEmbeddings, CancellationToken cancellationToken)
+    public async Task UpsertAsync(string tableName, string key, string metadata, float[] embedding, DateTime? timestamp, CancellationToken cancellationToken)
     {
         throw new NotImplementedException();
     }
 
     public async Task<OracleMemoryEntry?> ReadSingleAsync(string collectionName, string key, bool withEmbedding, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+
+    public IAsyncEnumerable<OracleMemoryEntry> ReadBatchAsync(string collectionName, IEnumerable<string> keys, bool withEmbeddings, CancellationToken cancellationToken)
     {
         throw new NotImplementedException();
     }
