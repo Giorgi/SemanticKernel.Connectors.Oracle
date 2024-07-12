@@ -1,77 +1,174 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using Microsoft.SemanticKernel.Memory;
+﻿using Microsoft.SemanticKernel.Memory;
+using Oracle.ManagedDataAccess.Client;
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 
 namespace SemanticKernel.Connectors.Oracle
 {
     [Experimental("SKEXP0001")]
-    public class OracleMemoryStore : IMemoryStore
+    public class OracleMemoryStore : IMemoryStore, IDisposable
     {
-        public Task CreateCollectionAsync(string collectionName, CancellationToken cancellationToken = new CancellationToken())
+        private readonly OracleDatabase database;
+
+        public OracleMemoryStore(string connectionString, int vectorSize)
         {
-            throw new NotImplementedException();
+            database = new OracleDatabase(new OracleConnection(connectionString), vectorSize, true);
         }
 
-        public IAsyncEnumerable<string> GetCollectionsAsync(CancellationToken cancellationToken = new CancellationToken())
+        public OracleMemoryStore(OracleConnection connection, int vectorSize)
         {
-            throw new NotImplementedException();
+            database = new OracleDatabase(connection, vectorSize);
         }
 
-        public Task<bool> DoesCollectionExistAsync(string collectionName, CancellationToken cancellationToken = new CancellationToken())
+        public async Task CreateCollectionAsync(string collectionName, CancellationToken cancellationToken = new CancellationToken())
         {
-            throw new NotImplementedException();
+            ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
+
+            await database.CreateTableAsync(collectionName, cancellationToken).ConfigureAwait(false);
         }
 
-        public Task DeleteCollectionAsync(string collectionName, CancellationToken cancellationToken = new CancellationToken())
+        public async IAsyncEnumerable<string> GetCollectionsAsync([EnumeratorCancellation] CancellationToken cancellationToken = new CancellationToken())
         {
-            throw new NotImplementedException();
+            await foreach (var collection in database.GetTablesAsync(cancellationToken).ConfigureAwait(false))
+            {
+                yield return collection;
+            }
         }
 
-        public Task<string> UpsertAsync(string collectionName, MemoryRecord record,
+        public async Task<bool> DoesCollectionExistAsync(string collectionName, CancellationToken cancellationToken = new CancellationToken())
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
+
+            return await database.DoesTableExistAsync(collectionName, cancellationToken).ConfigureAwait(false);
+        }
+
+        public async Task DeleteCollectionAsync(string collectionName, CancellationToken cancellationToken = new CancellationToken())
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
+
+            await database.DeleteTableAsync(collectionName, cancellationToken).ConfigureAwait(false);
+        }
+
+        public async Task<string> UpsertAsync(string collectionName, MemoryRecord record,
             CancellationToken cancellationToken = new CancellationToken())
         {
-            throw new NotImplementedException();
+            return await InternalUpsertAsync(collectionName, record, cancellationToken).ConfigureAwait(false);
         }
 
-        public IAsyncEnumerable<string> UpsertBatchAsync(string collectionName, IEnumerable<MemoryRecord> records,
+        public async IAsyncEnumerable<string> UpsertBatchAsync(string collectionName, IEnumerable<MemoryRecord> records,
+            [EnumeratorCancellation] CancellationToken cancellationToken = new CancellationToken())
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
+
+            foreach (var record in records)
+            {
+                yield return await InternalUpsertAsync(collectionName, record, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        public async Task<MemoryRecord?> GetAsync(string collectionName, string key, bool withEmbedding = false,
             CancellationToken cancellationToken = new CancellationToken())
         {
-            throw new NotImplementedException();
+            ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
+
+            return await InternalGetAsync(collectionName, key, withEmbedding, cancellationToken).ConfigureAwait(false);
         }
 
-        public Task<MemoryRecord?> GetAsync(string collectionName, string key, bool withEmbedding = false,
+        public async IAsyncEnumerable<MemoryRecord> GetBatchAsync(string collectionName, IEnumerable<string> keys, bool withEmbeddings = false,
+            [EnumeratorCancellation] CancellationToken cancellationToken = new CancellationToken())
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
+
+            await foreach (var entry in InternalGetAsync(collectionName, keys, withEmbeddings, cancellationToken).ConfigureAwait(false))
+            {
+                yield return entry;
+            }
+        }
+
+        public async Task RemoveAsync(string collectionName, string key, CancellationToken cancellationToken = new CancellationToken())
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
+
+            await database.DeleteAsync(collectionName, key, cancellationToken).ConfigureAwait(false);
+        }
+
+        public async Task RemoveBatchAsync(string collectionName, IEnumerable<string> keys,
             CancellationToken cancellationToken = new CancellationToken())
         {
-            throw new NotImplementedException();
+            ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
+
+            await database.RemoveAsync(collectionName, keys, cancellationToken).ConfigureAwait(false);
         }
 
-        public IAsyncEnumerable<MemoryRecord> GetBatchAsync(string collectionName, IEnumerable<string> keys, bool withEmbeddings = false,
-            CancellationToken cancellationToken = new CancellationToken())
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task RemoveAsync(string collectionName, string key, CancellationToken cancellationToken = new CancellationToken())
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task RemoveBatchAsync(string collectionName, IEnumerable<string> keys,
-            CancellationToken cancellationToken = new CancellationToken())
-        {
-            throw new NotImplementedException();
-        }
-
-        public IAsyncEnumerable<(MemoryRecord, double)> GetNearestMatchesAsync(string collectionName, ReadOnlyMemory<float> embedding, int limit,
+        public async IAsyncEnumerable<(MemoryRecord, double)> GetNearestMatchesAsync(string collectionName, ReadOnlyMemory<float> embedding, int limit,
             double minRelevanceScore = 0, bool withEmbeddings = false,
-            CancellationToken cancellationToken = new CancellationToken())
+            [EnumeratorCancellation] CancellationToken cancellationToken = new CancellationToken())
         {
-            throw new NotImplementedException();
+            ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
+
+            if (limit <= 0)
+            {
+                yield break;
+            }
+
+            var results = database.GetNearestMatchesAsync(
+                tableName: collectionName,
+                embedding: embedding,
+                limit: limit,
+                minRelevanceScore: minRelevanceScore,
+                withEmbeddings: withEmbeddings,
+                cancellationToken: cancellationToken);
+
+            await foreach (var (entry, cosineSimilarity) in results.ConfigureAwait(false))
+            {
+                yield return (GetMemoryRecordFromEntry(entry), cosineSimilarity);
+            }
         }
 
-        public Task<(MemoryRecord, double)?> GetNearestMatchAsync(string collectionName, ReadOnlyMemory<float> embedding, double minRelevanceScore = 0,
+        public async Task<(MemoryRecord, double)?> GetNearestMatchAsync(string collectionName, ReadOnlyMemory<float> embedding, double minRelevanceScore = 0,
             bool withEmbedding = false, CancellationToken cancellationToken = new CancellationToken())
         {
+            return await GetNearestMatchesAsync(
+                collectionName: collectionName,
+                embedding: embedding,
+                limit: 1,
+                minRelevanceScore: minRelevanceScore,
+                withEmbeddings: withEmbedding,
+                cancellationToken: cancellationToken).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        public void Dispose()
+        {
+            database.Dispose();
+        }
+
+        private async Task<string> InternalUpsertAsync(string collectionName, MemoryRecord record, CancellationToken cancellationToken)
+        {
             throw new NotImplementedException();
+        }
+
+        private async Task<MemoryRecord?> InternalGetAsync(string collectionName, string key, bool withEmbedding, CancellationToken cancellationToken)
+        {
+            var entry = await database.ReadSingleAsync(collectionName, key, withEmbedding, cancellationToken);
+
+            return entry == null ? null : GetMemoryRecordFromEntry(entry.Value);
+        }
+
+        private async IAsyncEnumerable<MemoryRecord> InternalGetAsync(string collectionName, IEnumerable<string> keys, bool withEmbeddings, [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await foreach (var entry in database.ReadBatchAsync(collectionName, keys, withEmbeddings, cancellationToken).ConfigureAwait(false))
+            {
+                yield return GetMemoryRecordFromEntry(entry);
+            }
+        }
+
+        private static MemoryRecord GetMemoryRecordFromEntry(OracleMemoryEntry entry)
+        {
+            return MemoryRecord.FromJsonMetadata(
+                json: entry.MetadataString,
+                embedding: entry.Embedding ?? ReadOnlyMemory<float>.Empty,
+                key: entry.Key,
+                timestamp: entry.Timestamp?.ToLocalTime());
         }
     }
 }
