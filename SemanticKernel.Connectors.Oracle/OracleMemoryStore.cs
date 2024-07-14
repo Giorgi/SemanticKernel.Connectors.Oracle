@@ -8,16 +8,16 @@ namespace SemanticKernel.Connectors.Oracle;
 [Experimental("SKEXP0001")]
 public class OracleMemoryStore : IMemoryStore, IDisposable
 {
-    private readonly OracleDatabase database;
+    private readonly OracleDatabaseManager databaseManager;
 
     public OracleMemoryStore(string connectionString, int vectorSize)
     {
-        database = new OracleDatabase(new OracleConnection(connectionString), vectorSize, true);
+        databaseManager = new OracleDatabaseManager(new OracleConnection(connectionString), vectorSize, true);
     }
 
     public OracleMemoryStore(OracleConnection connection, int vectorSize)
     {
-        database = new OracleDatabase(connection, vectorSize);
+        databaseManager = new OracleDatabaseManager(connection, vectorSize);
     }
 
     /// <inheritdoc/>
@@ -25,13 +25,13 @@ public class OracleMemoryStore : IMemoryStore, IDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
 
-        await database.CreateTableAsync(collectionName, cancellationToken).ConfigureAwait(false);
+        await databaseManager.CreateTableAsync(collectionName, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
     public async IAsyncEnumerable<string> GetCollectionsAsync([EnumeratorCancellation] CancellationToken cancellationToken = new CancellationToken())
     {
-        await foreach (var collection in database.GetTablesAsync(cancellationToken).ConfigureAwait(false))
+        await foreach (var collection in databaseManager.GetTablesAsync(cancellationToken).ConfigureAwait(false))
         {
             yield return collection;
         }
@@ -42,7 +42,7 @@ public class OracleMemoryStore : IMemoryStore, IDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
 
-        return await database.DoesTableExistAsync(collectionName, cancellationToken).ConfigureAwait(false);
+        return await databaseManager.DoesTableExistAsync(collectionName, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -50,7 +50,7 @@ public class OracleMemoryStore : IMemoryStore, IDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
 
-        await database.DeleteTableAsync(collectionName, cancellationToken).ConfigureAwait(false);
+        await databaseManager.DeleteTableAsync(collectionName, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -98,7 +98,7 @@ public class OracleMemoryStore : IMemoryStore, IDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
 
-        await database.DeleteAsync(collectionName, key, cancellationToken).ConfigureAwait(false);
+        await databaseManager.DeleteAsync(collectionName, key, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -107,7 +107,7 @@ public class OracleMemoryStore : IMemoryStore, IDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
 
-        await database.RemoveAsync(collectionName, keys, cancellationToken).ConfigureAwait(false);
+        await databaseManager.DeleteAsync(collectionName, keys, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -122,7 +122,7 @@ public class OracleMemoryStore : IMemoryStore, IDisposable
             yield break;
         }
 
-        var results = database.GetNearestMatchesAsync(
+        var results = databaseManager.GetNearestMatchesAsync(
             tableName: collectionName,
             embedding: embedding,
             limit: limit,
@@ -152,14 +152,14 @@ public class OracleMemoryStore : IMemoryStore, IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
-        database.Dispose();
+        databaseManager.Dispose();
     }
 
     private async Task<string> InternalUpsertAsync(string collectionName, MemoryRecord record, CancellationToken cancellationToken)
     {
         record.Key = record.Metadata.Id;
 
-        await database.UpsertAsync(
+        await databaseManager.UpsertAsync(
             tableName: collectionName,
             key: record.Key,
             metadata: record.GetSerializedMetadata(),
@@ -172,14 +172,14 @@ public class OracleMemoryStore : IMemoryStore, IDisposable
 
     private async Task<MemoryRecord?> InternalGetAsync(string collectionName, string key, bool withEmbedding, CancellationToken cancellationToken)
     {
-        var entry = await database.ReadSingleAsync(collectionName, key, withEmbedding, cancellationToken);
+        var entry = await databaseManager.ReadSingleAsync(collectionName, key, withEmbedding, cancellationToken);
 
         return entry == null ? null : GetMemoryRecordFromEntry(entry.Value);
     }
 
     private async IAsyncEnumerable<MemoryRecord> InternalGetAsync(string collectionName, IEnumerable<string> keys, bool withEmbeddings, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        await foreach (var entry in database.ReadBatchAsync(collectionName, keys, withEmbeddings, cancellationToken).ConfigureAwait(false))
+        await foreach (var entry in databaseManager.ReadBatchAsync(collectionName, keys, withEmbeddings, cancellationToken).ConfigureAwait(false))
         {
             yield return GetMemoryRecordFromEntry(entry);
         }

@@ -1,27 +1,52 @@
 ﻿using Oracle.ManagedDataAccess.Client;
+using System.Data;
 using System.Runtime.CompilerServices;
 
 namespace SemanticKernel.Connectors.Oracle;
 
-internal class OracleDatabase(OracleConnection oracleConnection, int vectorSize, bool ownsConnection = false) : IDisposable
+internal class OracleDatabaseManager : IDisposable
 {
-    private readonly int vectorSize = vectorSize;
+    private readonly int vectorSize;
+    private readonly OracleConnection oracleConnection;
+    private readonly bool ownsConnection;
+
+    public OracleDatabaseManager(OracleConnection oracleConnection, int vectorSize, bool ownsConnection = false)
+    {
+        this.vectorSize = vectorSize;
+        this.ownsConnection = ownsConnection;
+        this.oracleConnection = oracleConnection;
+
+        if (this.oracleConnection.State == ConnectionState.Closed)
+        {
+            this.oracleConnection.Open();
+        }
+    }
 
     public async Task CreateTableAsync(string collectionName, CancellationToken cancellationToken)
     {
         await using var command = oracleConnection.CreateCommand();
-        command.CommandText = $"CREATE TABLE {collectionName} (key VARCHAR2(256) NOT NULL, embedding BLOB NOT NULL, PRIMARY KEY(key))";
+        command.CommandText = $@"
+                CREATE TABLE IF NOT EXISTS {collectionName} (
+                    key TEXT NOT NULL,
+                    metadata JSON,
+                    embedding VECTOR({vectorSize}, FLOAT32),
+                    timestamp TIMESTAMP WITH TIME ZONE,
+                    PRIMARY KEY (key))";
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<bool> DoesTableExistAsync(string collectionName, CancellationToken cancellationToken)
     {
         await using var command = oracleConnection.CreateCommand();
-        command.CommandText = $"SELECT * FROM user_tables WHERE table_name = '{collectionName}'";
-        return (await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) != null; 
+        command.CommandText = $"SELECT * FROM user_tables WHERE table_name = :tableName";
+        command.BindByName = true;
+        command.Parameters.Add(new OracleParameter("tableName", collectionName.ToUpper()));
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        return reader.HasRows;
     }
 
-    public async IAsyncEnumerable<string> GetTablesAsync([EnumeratorCancellation]CancellationToken cancellationToken)
+    public async IAsyncEnumerable<string> GetTablesAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
         await using var command = oracleConnection.CreateCommand();
         command.CommandText = "SELECT table_name FROM user_tables";
@@ -35,15 +60,23 @@ internal class OracleDatabase(OracleConnection oracleConnection, int vectorSize,
 
     public async Task DeleteTableAsync(string collectionName, CancellationToken cancellationToken)
     {
-            
+        await using var command = oracleConnection.CreateCommand();
+        command.CommandText = $"DROP TABLE IF EXISTS {collectionName}";
+
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public async Task DeleteAsync(string collectionName, string key, CancellationToken cancellationToken)
     {
-            
+        await using var command = oracleConnection.CreateCommand();
+        command.BindByName = true;
+        command.CommandText = $"DELETE FROM {collectionName} WHERE key=:key";
+        command.Parameters.Add(new OracleParameter("key", key));
+
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task RemoveAsync(string collectionName, IEnumerable<string> keys, CancellationToken cancellationToken)
+    public async Task DeleteAsync(string collectionName, IEnumerable<string> keys, CancellationToken cancellationToken)
     {
         throw new NotImplementedException();
     }
@@ -72,7 +105,7 @@ internal class OracleDatabase(OracleConnection oracleConnection, int vectorSize,
     {
         if (ownsConnection)
         {
-            oracleConnection.Dispose(); 
+            oracleConnection.Dispose();
         }
     }
 }
