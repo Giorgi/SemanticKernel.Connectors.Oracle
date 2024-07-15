@@ -21,7 +21,7 @@ public class OracleMemoryStore : IMemoryStore, IDisposable
     }
 
     /// <inheritdoc/>
-    public async Task CreateCollectionAsync(string collectionName, CancellationToken cancellationToken = new CancellationToken())
+    public async Task CreateCollectionAsync(string collectionName, CancellationToken cancellationToken = new())
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
 
@@ -29,7 +29,7 @@ public class OracleMemoryStore : IMemoryStore, IDisposable
     }
 
     /// <inheritdoc/>
-    public async IAsyncEnumerable<string> GetCollectionsAsync([EnumeratorCancellation] CancellationToken cancellationToken = new CancellationToken())
+    public async IAsyncEnumerable<string> GetCollectionsAsync([EnumeratorCancellation] CancellationToken cancellationToken = new())
     {
         await foreach (var collection in databaseManager.GetTablesAsync(cancellationToken).ConfigureAwait(false))
         {
@@ -38,7 +38,7 @@ public class OracleMemoryStore : IMemoryStore, IDisposable
     }
 
     /// <inheritdoc/>
-    public async Task<bool> DoesCollectionExistAsync(string collectionName, CancellationToken cancellationToken = new CancellationToken())
+    public async Task<bool> DoesCollectionExistAsync(string collectionName, CancellationToken cancellationToken = new())
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
 
@@ -46,7 +46,7 @@ public class OracleMemoryStore : IMemoryStore, IDisposable
     }
 
     /// <inheritdoc/>
-    public async Task DeleteCollectionAsync(string collectionName, CancellationToken cancellationToken = new CancellationToken())
+    public async Task DeleteCollectionAsync(string collectionName, CancellationToken cancellationToken = new())
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
 
@@ -55,14 +55,14 @@ public class OracleMemoryStore : IMemoryStore, IDisposable
 
     /// <inheritdoc/>
     public async Task<string> UpsertAsync(string collectionName, MemoryRecord record,
-        CancellationToken cancellationToken = new CancellationToken())
+        CancellationToken cancellationToken = new())
     {
         return await InternalUpsertAsync(collectionName, record, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
     public async IAsyncEnumerable<string> UpsertBatchAsync(string collectionName, IEnumerable<MemoryRecord> records,
-        [EnumeratorCancellation] CancellationToken cancellationToken = new CancellationToken())
+        [EnumeratorCancellation] CancellationToken cancellationToken = new())
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
 
@@ -74,7 +74,7 @@ public class OracleMemoryStore : IMemoryStore, IDisposable
 
     /// <inheritdoc/>
     public async Task<MemoryRecord?> GetAsync(string collectionName, string key, bool withEmbedding = false,
-        CancellationToken cancellationToken = new CancellationToken())
+        CancellationToken cancellationToken = new())
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
 
@@ -83,7 +83,7 @@ public class OracleMemoryStore : IMemoryStore, IDisposable
 
     /// <inheritdoc/>
     public async IAsyncEnumerable<MemoryRecord> GetBatchAsync(string collectionName, IEnumerable<string> keys, bool withEmbeddings = false,
-        [EnumeratorCancellation] CancellationToken cancellationToken = new CancellationToken())
+        [EnumeratorCancellation] CancellationToken cancellationToken = new())
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
 
@@ -94,7 +94,7 @@ public class OracleMemoryStore : IMemoryStore, IDisposable
     }
 
     /// <inheritdoc/>
-    public async Task RemoveAsync(string collectionName, string key, CancellationToken cancellationToken = new CancellationToken())
+    public async Task RemoveAsync(string collectionName, string key, CancellationToken cancellationToken = new())
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
 
@@ -103,7 +103,7 @@ public class OracleMemoryStore : IMemoryStore, IDisposable
 
     /// <inheritdoc/>
     public async Task RemoveBatchAsync(string collectionName, IEnumerable<string> keys,
-        CancellationToken cancellationToken = new CancellationToken())
+        CancellationToken cancellationToken = new())
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
 
@@ -113,7 +113,7 @@ public class OracleMemoryStore : IMemoryStore, IDisposable
     /// <inheritdoc/>
     public async IAsyncEnumerable<(MemoryRecord, double)> GetNearestMatchesAsync(string collectionName, ReadOnlyMemory<float> embedding, int limit,
         double minRelevanceScore = 0, bool withEmbeddings = false,
-        [EnumeratorCancellation] CancellationToken cancellationToken = new CancellationToken())
+        [EnumeratorCancellation] CancellationToken cancellationToken = new())
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
 
@@ -138,7 +138,7 @@ public class OracleMemoryStore : IMemoryStore, IDisposable
 
     /// <inheritdoc/>
     public async Task<(MemoryRecord, double)?> GetNearestMatchAsync(string collectionName, ReadOnlyMemory<float> embedding, double minRelevanceScore = 0,
-        bool withEmbedding = false, CancellationToken cancellationToken = new CancellationToken())
+        bool withEmbedding = false, CancellationToken cancellationToken = new())
     {
         return await GetNearestMatchesAsync(
             collectionName: collectionName,

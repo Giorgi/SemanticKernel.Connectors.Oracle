@@ -10,6 +10,15 @@ internal class OracleDatabaseManager : IDisposable
     private readonly OracleConnection oracleConnection;
     private readonly bool ownsConnection;
 
+    private const string QueryColumnsWithoutEmbeddings = "key, metadata, timestamp";
+    private const string QueryColumnsWithEmbeddings = QueryColumnsWithoutEmbeddings + " , embedding";
+
+    private const int KeyIndex = 0;
+    private const int MetadataIndex = KeyIndex + 1;
+    private const int TimestampIndex = MetadataIndex + 1;
+    private const int EmbeddingIndex = TimestampIndex + 1;
+    private const int CosineDistanceIndex = EmbeddingIndex + 1;
+
     public OracleDatabaseManager(OracleConnection oracleConnection, int vectorSize, bool ownsConnection = false)
     {
         this.vectorSize = vectorSize;
@@ -22,11 +31,11 @@ internal class OracleDatabaseManager : IDisposable
         }
     }
 
-    public async Task CreateTableAsync(string collectionName, CancellationToken cancellationToken)
+    public async Task CreateTableAsync(string tableName, CancellationToken cancellationToken)
     {
         await using var command = oracleConnection.CreateCommand();
         command.CommandText = $@"
-                CREATE TABLE IF NOT EXISTS {collectionName} (
+                CREATE TABLE IF NOT EXISTS {tableName} (
                     key TEXT NOT NULL,
                     metadata JSON,
                     embedding VECTOR({vectorSize}, FLOAT32),
@@ -35,12 +44,12 @@ internal class OracleDatabaseManager : IDisposable
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<bool> DoesTableExistAsync(string collectionName, CancellationToken cancellationToken)
+    public async Task<bool> DoesTableExistAsync(string tableName, CancellationToken cancellationToken)
     {
         await using var command = oracleConnection.CreateCommand();
-        command.CommandText = $"SELECT * FROM user_tables WHERE table_name = :tableName";
         command.BindByName = true;
-        command.Parameters.Add(new OracleParameter("tableName", collectionName.ToUpper()));
+        command.CommandText = $"SELECT * FROM user_tables WHERE table_name = :tableName";
+        command.Parameters.Add("tableName", tableName.ToUpper());
 
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         return reader.HasRows;
@@ -58,47 +67,120 @@ internal class OracleDatabaseManager : IDisposable
         }
     }
 
-    public async Task DeleteTableAsync(string collectionName, CancellationToken cancellationToken)
+    public async Task DeleteTableAsync(string tableName, CancellationToken cancellationToken)
     {
         await using var command = oracleConnection.CreateCommand();
-        command.CommandText = $"DROP TABLE IF EXISTS {collectionName}";
+        command.CommandText = $"DROP TABLE IF EXISTS {tableName}";
 
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task DeleteAsync(string collectionName, string key, CancellationToken cancellationToken)
+    public async Task DeleteAsync(string tableName, string key, CancellationToken cancellationToken)
     {
         await using var command = oracleConnection.CreateCommand();
         command.BindByName = true;
-        command.CommandText = $"DELETE FROM {collectionName} WHERE key=:key";
-        command.Parameters.Add(new OracleParameter("key", key));
+        command.CommandText = $"DELETE FROM {tableName} WHERE key=:key";
+        command.Parameters.Add("key", key);
 
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task DeleteAsync(string collectionName, IEnumerable<string> keys, CancellationToken cancellationToken)
+    public async Task DeleteAsync(string tableName, IEnumerable<string> keys, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var keysArray = keys.ToArray();
+
+        await using var command = oracleConnection.CreateCommand();
+
+        command.BindByName = true;
+        command.ArrayBindCount = keysArray.Length;
+
+        command.CommandText = $"DELETE FROM {tableName} WHERE key=:key";
+        command.Parameters.Add("key", keysArray);
+
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task UpsertAsync(string tableName, string key, string metadata, float[] embedding, DateTime? timestamp, CancellationToken cancellationToken)
+    public async Task UpsertAsync(string tableName, string key, string? metadata, float[] embedding, DateTime? timestamp, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        await using var command = oracleConnection.CreateCommand();
+        command.BindByName = true;
+
+        command.CommandText = $@"MERGE INTO {tableName} 
+                USING dual ON (key=:key)
+                WHEN MATCHED THEN UPDATE SET metadata=:metadata, embedding=:embedding, timestamp=:timestamp
+                WHEN NOT MATCHED THEN INSERT (key, metadata, embedding, timestamp) VALUES (:key, :metadata, :embedding, :timestamp)";
+
+        command.Parameters.Add("key", key);
+        command.Parameters.Add("metadata", OracleDbType.Json, metadata?.Length ?? 0, metadata ?? (object)DBNull.Value, ParameterDirection.Input);
+        command.Parameters.Add("embedding", embedding ?? (object)DBNull.Value);
+        command.Parameters.Add("timestamp", timestamp ?? (object)DBNull.Value);
+
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<OracleMemoryEntry?> ReadSingleAsync(string collectionName, string key, bool withEmbedding, CancellationToken cancellationToken)
+    public async Task<OracleMemoryEntry?> ReadSingleAsync(string tableName, string key, bool withEmbeddings, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        await using var command = oracleConnection.CreateCommand();
+        command.BindByName = true;
+        command.CommandText = $"SELECT {(withEmbeddings ? QueryColumnsWithEmbeddings : QueryColumnsWithoutEmbeddings)} FROM {tableName} WHERE key=@key";
+        command.Parameters.Add("key", key);
+
+        await using var dataReader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        if (await dataReader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return await ReadEntryAsync(dataReader, withEmbeddings, cancellationToken).ConfigureAwait(false);
+        }
+
+        return null;
     }
 
-    public IAsyncEnumerable<OracleMemoryEntry> ReadBatchAsync(string collectionName, IEnumerable<string> keys, bool withEmbeddings, CancellationToken cancellationToken)
+    public async IAsyncEnumerable<OracleMemoryEntry> ReadBatchAsync(string tableName, IEnumerable<string> keys, bool withEmbeddings, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        var keysArray = keys.ToArray();
+        if (keysArray.Length == 0)
+        {
+            yield break;
+        }
+
+        await using var command = oracleConnection.CreateCommand();
+
+        command.BindByName = true;
+        command.ArrayBindCount = keysArray.Length;
+
+        command.CommandText = $"SELECT {(withEmbeddings ? QueryColumnsWithEmbeddings : QueryColumnsWithoutEmbeddings)} FROM {tableName} WHERE key=ANY(@keys)";
+
+        command.Parameters.Add("key", keysArray);
+
+        await using var dataReader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await dataReader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            yield return await this.ReadEntryAsync(dataReader, withEmbeddings, cancellationToken).ConfigureAwait(false);
+        }
     }
 
-    public IAsyncEnumerable<(OracleMemoryEntry, double)> GetNearestMatchesAsync(string tableName, ReadOnlyMemory<float> embedding, int limit, double minRelevanceScore, bool withEmbeddings, CancellationToken cancellationToken)
+    public async IAsyncEnumerable<(OracleMemoryEntry, double)> GetNearestMatchesAsync(string tableName, ReadOnlyMemory<float> embedding, int limit, double minRelevanceScore, bool withEmbeddings, CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        await using var command = oracleConnection.CreateCommand();
+
+        command.BindByName = true;
+        command.CommandText = @$"
+            SELECT * FROM (SELECT {(withEmbeddings ? QueryColumnsWithEmbeddings : QueryColumnsWithoutEmbeddings)}, 1 - (embedding <=> :embedding) AS cosine_similarity FROM {tableName}
+            ) AS sk_memory_cosine_similarity_table
+            WHERE cosine_similarity >= @min_relevance_score
+            ORDER BY cosine_similarity DESC
+            Limit @limit";
+        command.Parameters.Add("embedding", embedding);
+        command.Parameters.Add("collection", tableName);
+        command.Parameters.Add("min_relevance_score", minRelevanceScore);
+        command.Parameters.Add("limit", limit);
+
+        await using var dataReader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+
+        while (await dataReader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var cosineSimilarity = dataReader.GetDouble(CosineDistanceIndex);
+            yield return (await this.ReadEntryAsync(dataReader, withEmbeddings, cancellationToken).ConfigureAwait(false), cosineSimilarity);
+        }
     }
 
     public void Dispose()
@@ -107,5 +189,15 @@ internal class OracleDatabaseManager : IDisposable
         {
             oracleConnection.Dispose();
         }
+    }
+
+    private async Task<OracleMemoryEntry> ReadEntryAsync(OracleDataReader dataReader, bool withEmbeddings = false, CancellationToken cancellationToken = default)
+    {
+        var key = dataReader.GetString(KeyIndex);
+        var metadata = dataReader.GetString(MetadataIndex);
+        var timestamp = await dataReader.GetFieldValueAsync<DateTime?>(TimestampIndex, cancellationToken).ConfigureAwait(false);
+        var embedding = withEmbeddings ? await dataReader.GetFieldValueAsync<float[]>(EmbeddingIndex, cancellationToken).ConfigureAwait(false) : null;
+
+        return new OracleMemoryEntry() { Key = key, MetadataString = metadata, Embedding = embedding, Timestamp = timestamp };
     }
 }

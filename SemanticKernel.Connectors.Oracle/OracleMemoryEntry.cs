@@ -18,7 +18,7 @@ public record struct OracleMemoryEntry
     /// <summary>
     /// The embedding data.
     /// </summary>
-    public float[] Embedding { get; set; }
+    public float[]? Embedding { get; set; }
 
     /// <summary>
     /// Optional timestamp. Its 'DateTimeKind' is <see cref="DateTimeKind.Utc"/>
