@@ -36,7 +36,7 @@ internal class OracleDatabaseManager : IDisposable
         await using var command = oracleConnection.CreateCommand();
         command.CommandText = $@"
                 CREATE TABLE IF NOT EXISTS {tableName} (
-                    key TEXT NOT NULL,
+                    key Varchar2(100) NOT NULL,
                     metadata JSON,
                     embedding VECTOR({vectorSize}, FLOAT32),
                     timestamp TIMESTAMP WITH TIME ZONE,
@@ -112,7 +112,7 @@ internal class OracleDatabaseManager : IDisposable
 
         command.Parameters.Add("key", key);
         command.Parameters.Add("metadata", OracleDbType.Json, metadata?.Length ?? 0, metadata ?? (object)DBNull.Value, ParameterDirection.Input);
-        command.Parameters.Add("embedding", embedding ?? (object)DBNull.Value);
+        command.Parameters.Add("embedding", OracleDbType.Vector_Float32, embedding ?? (object)DBNull.Value, ParameterDirection.Input);
         command.Parameters.Add("timestamp", timestamp ?? (object)DBNull.Value);
 
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
@@ -122,7 +122,7 @@ internal class OracleDatabaseManager : IDisposable
     {
         await using var command = oracleConnection.CreateCommand();
         command.BindByName = true;
-        command.CommandText = $"SELECT {(withEmbeddings ? QueryColumnsWithEmbeddings : QueryColumnsWithoutEmbeddings)} FROM {tableName} WHERE key=@key";
+        command.CommandText = $"SELECT {(withEmbeddings ? QueryColumnsWithEmbeddings : QueryColumnsWithoutEmbeddings)} FROM {tableName} WHERE key=:key";
         command.Parameters.Add("key", key);
 
         await using var dataReader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -147,7 +147,7 @@ internal class OracleDatabaseManager : IDisposable
         command.BindByName = true;
         command.ArrayBindCount = keysArray.Length;
 
-        command.CommandText = $"SELECT {(withEmbeddings ? QueryColumnsWithEmbeddings : QueryColumnsWithoutEmbeddings)} FROM {tableName} WHERE key=ANY(@keys)";
+        command.CommandText = $"SELECT {(withEmbeddings ? QueryColumnsWithEmbeddings : QueryColumnsWithoutEmbeddings)} FROM {tableName} WHERE key= :key";
 
         command.Parameters.Add("key", keysArray);
 
@@ -165,20 +165,18 @@ internal class OracleDatabaseManager : IDisposable
         command.BindByName = true;
         command.CommandText = @$"
             SELECT * FROM (SELECT {(withEmbeddings ? QueryColumnsWithEmbeddings : QueryColumnsWithoutEmbeddings)}, 1 - (embedding <=> :embedding) AS cosine_similarity FROM {tableName}
-            ) AS sk_memory_cosine_similarity_table
-            WHERE cosine_similarity >= @min_relevance_score
-            ORDER BY cosine_similarity DESC
-            Limit @limit";
-        command.Parameters.Add("embedding", embedding);
-        command.Parameters.Add("collection", tableName);
+            ) sk_memory_cosine_similarity_table
+            WHERE cosine_similarity >= :min_relevance_score
+            ORDER BY cosine_similarity DESC";
+        command.Parameters.Add("embedding", OracleDbType.Vector_Float32, embedding.ToArray(), ParameterDirection.Input);
         command.Parameters.Add("min_relevance_score", minRelevanceScore);
-        command.Parameters.Add("limit", limit);
+        //        command.Parameters.Add("limit", limit);
 
         await using var dataReader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
 
         while (await dataReader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            var cosineSimilarity = dataReader.GetDouble(CosineDistanceIndex);
+            var cosineSimilarity = dataReader.GetDouble(dataReader.FieldCount - 1);
             yield return (await this.ReadEntryAsync(dataReader, withEmbeddings, cancellationToken).ConfigureAwait(false), cosineSimilarity);
         }
     }
@@ -195,7 +193,7 @@ internal class OracleDatabaseManager : IDisposable
     {
         var key = dataReader.GetString(KeyIndex);
         var metadata = dataReader.GetString(MetadataIndex);
-        var timestamp = await dataReader.GetFieldValueAsync<DateTime?>(TimestampIndex, cancellationToken).ConfigureAwait(false);
+        var timestamp = dataReader.IsDBNull(TimestampIndex) ? null : await dataReader.GetFieldValueAsync<DateTime?>(TimestampIndex, cancellationToken).ConfigureAwait(false);
         var embedding = withEmbeddings ? await dataReader.GetFieldValueAsync<float[]>(EmbeddingIndex, cancellationToken).ConfigureAwait(false) : null;
 
         return new OracleMemoryEntry() { Key = key, MetadataString = metadata, Embedding = embedding, Timestamp = timestamp };
