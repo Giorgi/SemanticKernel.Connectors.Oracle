@@ -17,7 +17,6 @@ internal class OracleDatabaseManager : IDisposable
     private const int MetadataIndex = KeyIndex + 1;
     private const int TimestampIndex = MetadataIndex + 1;
     private const int EmbeddingIndex = TimestampIndex + 1;
-    private const int CosineDistanceIndex = EmbeddingIndex + 1;
 
     public OracleDatabaseManager(OracleConnection oracleConnection, int vectorSize, bool ownsConnection = false)
     {
@@ -39,7 +38,7 @@ internal class OracleDatabaseManager : IDisposable
                     key Varchar2(100) NOT NULL,
                     metadata JSON,
                     embedding VECTOR({vectorSize}, FLOAT32),
-                    timestamp TIMESTAMP WITH TIME ZONE,
+                    timestamp TIMESTAMP,
                     PRIMARY KEY (key))";
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
@@ -136,26 +135,38 @@ internal class OracleDatabaseManager : IDisposable
 
     public async IAsyncEnumerable<OracleMemoryEntry> ReadBatchAsync(string tableName, IEnumerable<string> keys, bool withEmbeddings, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var keysArray = keys.ToArray();
-        if (keysArray.Length == 0)
+        //var keysArray = keys.ToArray();
+        //if (keysArray.Length == 0)
+        //{
+        //    yield break;
+        //}
+
+        foreach (var key in keys)
         {
-            yield break;
+            var oracleMemoryEntry = await ReadSingleAsync(tableName, key, withEmbeddings, cancellationToken).ConfigureAwait(false);
+
+            if (oracleMemoryEntry == null)
+            {
+                continue;
+            }
+
+            yield return oracleMemoryEntry.Value;
         }
 
-        await using var command = oracleConnection.CreateCommand();
+        //await using var command = oracleConnection.CreateCommand();
 
-        command.BindByName = true;
-        command.ArrayBindCount = keysArray.Length;
+        //command.BindByName = true;
+        //command.ArrayBindCount = keysArray.Length;
 
-        command.CommandText = $"SELECT {(withEmbeddings ? QueryColumnsWithEmbeddings : QueryColumnsWithoutEmbeddings)} FROM {tableName} WHERE key= :key";
+        //command.CommandText = $"SELECT {(withEmbeddings ? QueryColumnsWithEmbeddings : QueryColumnsWithoutEmbeddings)} FROM {tableName} WHERE key = :key";
 
-        command.Parameters.Add("key", keysArray);
+        //command.Parameters.Add("key", keysArray);
 
-        await using var dataReader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-        while (await dataReader.ReadAsync(cancellationToken).ConfigureAwait(false))
-        {
-            yield return await this.ReadEntryAsync(dataReader, withEmbeddings, cancellationToken).ConfigureAwait(false);
-        }
+        //await using var dataReader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        //while (await dataReader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        //{
+        //    yield return await this.ReadEntryAsync(dataReader, withEmbeddings, cancellationToken).ConfigureAwait(false);
+        //}
     }
 
     public async IAsyncEnumerable<(OracleMemoryEntry, double)> GetNearestMatchesAsync(string tableName, ReadOnlyMemory<float> embedding, int limit, double minRelevanceScore, bool withEmbeddings, CancellationToken cancellationToken)
@@ -167,10 +178,12 @@ internal class OracleDatabaseManager : IDisposable
             SELECT * FROM (SELECT {(withEmbeddings ? QueryColumnsWithEmbeddings : QueryColumnsWithoutEmbeddings)}, 1 - (embedding <=> :embedding) AS cosine_similarity FROM {tableName}
             ) sk_memory_cosine_similarity_table
             WHERE cosine_similarity >= :min_relevance_score
-            ORDER BY cosine_similarity DESC";
+            ORDER BY cosine_similarity DESC
+            FETCH NEXT :limit ROWS ONLY";
+
         command.Parameters.Add("embedding", OracleDbType.Vector_Float32, embedding.ToArray(), ParameterDirection.Input);
         command.Parameters.Add("min_relevance_score", minRelevanceScore);
-        //        command.Parameters.Add("limit", limit);
+        command.Parameters.Add("limit", limit);
 
         await using var dataReader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
 
@@ -193,7 +206,7 @@ internal class OracleDatabaseManager : IDisposable
     {
         var key = dataReader.GetString(KeyIndex);
         var metadata = dataReader.GetString(MetadataIndex);
-        var timestamp = dataReader.IsDBNull(TimestampIndex) ? null : await dataReader.GetFieldValueAsync<DateTime?>(TimestampIndex, cancellationToken).ConfigureAwait(false);
+        var timestamp = dataReader.IsDBNull(TimestampIndex) ? (DateTime?)null : await dataReader.GetFieldValueAsync<DateTime>(TimestampIndex, cancellationToken).ConfigureAwait(false);
         var embedding = withEmbeddings ? await dataReader.GetFieldValueAsync<float[]>(EmbeddingIndex, cancellationToken).ConfigureAwait(false) : null;
 
         return new OracleMemoryEntry() { Key = key, MetadataString = metadata, Embedding = embedding, Timestamp = timestamp };
