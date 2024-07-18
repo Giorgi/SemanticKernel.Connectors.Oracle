@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.10.34916.146
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SemanticKernel.Connectors.Oracle", "SemanticKernel.Connectors.Oracle\SemanticKernel.Connectors.Oracle.csproj", "{363EAC86-0150-47BC-A08B-9D5368CE4E0A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SemanticKernel.Connectors.Oracle", "SemanticKernel.Connectors.Oracle\SemanticKernel.Connectors.Oracle.csproj", "{363EAC86-0150-47BC-A08B-9D5368CE4E0A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SemanticKernel.Connectors.Oracle.Test", "SemanticKernel.Connectors.Oracle.Test\SemanticKernel.Connectors.Oracle.Test.csproj", "{CFECC58D-3E32-443C-9D60-9C655806A793}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{363EAC86-0150-47BC-A08B-9D5368CE4E0A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{363EAC86-0150-47BC-A08B-9D5368CE4E0A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{363EAC86-0150-47BC-A08B-9D5368CE4E0A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CFECC58D-3E32-443C-9D60-9C655806A793}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CFECC58D-3E32-443C-9D60-9C655806A793}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CFECC58D-3E32-443C-9D60-9C655806A793}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CFECC58D-3E32-443C-9D60-9C655806A793}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
