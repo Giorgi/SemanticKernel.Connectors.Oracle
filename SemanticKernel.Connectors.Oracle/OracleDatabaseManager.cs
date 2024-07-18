@@ -1,4 +1,8 @@
-﻿using Oracle.ManagedDataAccess.Client;
+﻿// This file is based on https://github.com/microsoft/semantic-kernel/blob/main/dotnet/src/Connectors/Connectors.Memory.Postgres/PostgresDbClient.cs
+// Copyright (c) Microsoft. All rights reserved.
+// Adapted for OracleMemoryStore by Giorgi Dalakishvili
+
+using Oracle.ManagedDataAccess.Client;
 using System.Data;
 using System.Runtime.CompilerServices;
 using System.Text.Json;

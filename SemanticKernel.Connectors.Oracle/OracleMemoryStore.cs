@@ -1,4 +1,8 @@
-﻿using Microsoft.SemanticKernel.Memory;
+﻿// This file is based on https://github.com/microsoft/semantic-kernel/blob/main/dotnet/src/Connectors/Connectors.Memory.Postgres/PostgresMemoryStore.cs
+// Copyright (c) Microsoft. All rights reserved.
+// Adapted as OracleMemoryStore by Giorgi Dalakishvili
+
+using Microsoft.SemanticKernel.Memory;
 using Oracle.ManagedDataAccess.Client;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
