@@ -26,5 +26,5 @@ jobs:
       run: dotnet build --no-restore --configuration Release
     - name: Test
       env: # Or as an environment variable
-        SK_ConnectionString: ${{ SK_ConnectionString }}
+        SK_ConnectionString: ${{ secrets.SK_ConnectionString }}
       run: dotnet test --no-build --verbosity normal --configuration Release
