@@ -1,14 +1,15 @@
 ﻿using Oracle.ManagedDataAccess.Client;
 using System.Data;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 
 namespace SemanticKernel.Connectors.Oracle;
 
 internal class OracleDatabaseManager : IDisposable
 {
     private readonly int vectorSize;
-    private readonly OracleConnection oracleConnection;
     private readonly bool ownsConnection;
+    private readonly OracleConnection oracleConnection;
 
     private const string QueryColumnsWithoutEmbeddings = "key, metadata, timestamp";
     private const string QueryColumnsWithEmbeddings = QueryColumnsWithoutEmbeddings + " , embedding";
@@ -47,7 +48,7 @@ internal class OracleDatabaseManager : IDisposable
     {
         await using var command = oracleConnection.CreateCommand();
         command.BindByName = true;
-        command.CommandText = $"SELECT * FROM user_tables WHERE table_name = :tableName";
+        command.CommandText = "SELECT * FROM user_tables WHERE table_name = :tableName";
         command.Parameters.Add("tableName", tableName.ToUpper());
 
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -77,6 +78,7 @@ internal class OracleDatabaseManager : IDisposable
     public async Task DeleteAsync(string tableName, string key, CancellationToken cancellationToken)
     {
         await using var command = oracleConnection.CreateCommand();
+
         command.BindByName = true;
         command.CommandText = $"DELETE FROM {tableName} WHERE key=:key";
         command.Parameters.Add("key", key);
@@ -111,7 +113,7 @@ internal class OracleDatabaseManager : IDisposable
 
         command.Parameters.Add("key", key);
         command.Parameters.Add("metadata", OracleDbType.Json, metadata?.Length ?? 0, metadata ?? (object)DBNull.Value, ParameterDirection.Input);
-        command.Parameters.Add("embedding", OracleDbType.Vector_Float32, embedding ?? (object)DBNull.Value, ParameterDirection.Input);
+        command.Parameters.Add("embedding", OracleDbType.Vector_Float32, embedding, ParameterDirection.Input);
         command.Parameters.Add("timestamp", timestamp ?? (object)DBNull.Value);
 
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
@@ -135,41 +137,28 @@ internal class OracleDatabaseManager : IDisposable
 
     public async IAsyncEnumerable<OracleMemoryEntry> ReadBatchAsync(string tableName, IEnumerable<string> keys, bool withEmbeddings, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        //var keysArray = keys.ToArray();
-        //if (keysArray.Length == 0)
-        //{
-        //    yield break;
-        //}
+        var keyList = keys.ToList();
 
-        foreach (var key in keys)
+        if (keyList.Count == 0)
         {
-            var oracleMemoryEntry = await ReadSingleAsync(tableName, key, withEmbeddings, cancellationToken).ConfigureAwait(false);
-
-            if (oracleMemoryEntry == null)
-            {
-                continue;
-            }
-
-            yield return oracleMemoryEntry.Value;
+            yield break;
         }
 
-        //await using var command = oracleConnection.CreateCommand();
+        await using var command = oracleConnection.CreateCommand();
+        command.BindByName = true;
 
-        //command.BindByName = true;
-        //command.ArrayBindCount = keysArray.Length;
+        command.CommandText = $"Select {(withEmbeddings ? QueryColumnsWithEmbeddings : QueryColumnsWithoutEmbeddings)} from {tableName} where key in (Select key from JSON_TABLE(:json, '$[*]' Columns (key PATH '$')))";
+        command.Parameters.Add("json", OracleDbType.Json, JsonSerializer.Serialize(keyList), ParameterDirection.Input);
 
-        //command.CommandText = $"SELECT {(withEmbeddings ? QueryColumnsWithEmbeddings : QueryColumnsWithoutEmbeddings)} FROM {tableName} WHERE key = :key";
+        await using var dataReader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
 
-        //command.Parameters.Add("key", keysArray);
-
-        //await using var dataReader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-        //while (await dataReader.ReadAsync(cancellationToken).ConfigureAwait(false))
-        //{
-        //    yield return await this.ReadEntryAsync(dataReader, withEmbeddings, cancellationToken).ConfigureAwait(false);
-        //}
+        while (await dataReader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            yield return await ReadEntryAsync(dataReader, withEmbeddings, cancellationToken).ConfigureAwait(false);
+        }
     }
 
-    public async IAsyncEnumerable<(OracleMemoryEntry, double)> GetNearestMatchesAsync(string tableName, ReadOnlyMemory<float> embedding, int limit, double minRelevanceScore, bool withEmbeddings, CancellationToken cancellationToken)
+    public async IAsyncEnumerable<(OracleMemoryEntry, double)> GetNearestMatchesAsync(string tableName, ReadOnlyMemory<float> embedding, int limit, double minRelevanceScore, bool withEmbeddings, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         await using var command = oracleConnection.CreateCommand();
 
