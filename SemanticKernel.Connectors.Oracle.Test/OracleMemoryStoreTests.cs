@@ -2,12 +2,11 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Adapted for OracleMemoryStore by Giorgi Dalakishvili
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.SemanticKernel.Memory;
 using Oracle.ManagedDataAccess.Client;
-using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
-using Microsoft.Extensions.Configuration;
 
 namespace SemanticKernel.Connectors.Oracle.Test;
 
@@ -19,10 +18,16 @@ public class OracleMemoryStoreTests : IDisposable
 
     static OracleMemoryStoreTests()
     {
-        var builder = new ConfigurationBuilder().AddJsonFile($"testsettings.json", optional: false);
+        var builder = new ConfigurationBuilder()
+               .AddEnvironmentVariables("SK_")
+#if DEBUG
+               .AddJsonFile($"testsettings.json", optional: true)
+#endif
+            ;
+
         var configurationRoot = builder.Build();
 
-        var connectionString = configurationRoot.GetConnectionString("Oracle");
+        var connectionString = configurationRoot["ConnectionString"];
 
         if (string.IsNullOrEmpty(connectionString))
         {
