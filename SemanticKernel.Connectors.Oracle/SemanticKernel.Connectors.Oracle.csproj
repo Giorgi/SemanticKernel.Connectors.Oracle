@@ -8,8 +8,12 @@
     <Authors>Giorgi Dalakishvili</Authors>
     <Company>Giorgi Dalakishvili</Company>
     <Copyright>Copyright © 2024 Giorgi Dalakishvili</Copyright>
+    <Description>Oracle connector for Semantic Kernel plugins and semantic memory</Description>
 
     <Product>SemanticKernel.Connectors.Oracle</Product>
+    <PackageReleaseNotes>
+      Initial Release
+    </PackageReleaseNotes>
     <PackageId>SemanticKernel.Connectors.Oracle</PackageId>
     <PackageTags>AI;SemanticKernel;Oracle;vector;database</PackageTags>
     <PackageIcon>Logo.png</PackageIcon>
