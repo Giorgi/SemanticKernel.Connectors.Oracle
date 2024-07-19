@@ -3,6 +3,7 @@
 [Semantic Kernel](https://github.com/microsoft/semantic-kernel) memory built on top of Oracle. Requires [Oracle Database 23ai](https://www.oracle.com/database/23ai/#ai-ml)
 
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/Giorgi/SemanticKernel.Connectors.Oracle/dotnet.yml?branch=main&logo=GitHub&style=for-the-badge)](https://github.com/Giorgi/SemanticKernel.Connectors.Oracle/actions/workflows/dotnet.yml)
+[![Coveralls](https://img.shields.io/coveralls/github/Giorgi/SemanticKernel.Connectors.Oracle?logo=coveralls&style=for-the-badge)](https://coveralls.io/github/Giorgi/SemanticKernel.Connectors.Oracle)
 [![License](https://img.shields.io/badge/License-Mit-blue.svg?style=for-the-badge&logo=mit)](LICENSE.md)
 [![Ko-Fi](https://img.shields.io/static/v1?style=for-the-badge&message=Support%20the%20Project&color=success&logo=ko-fi&label=$$)](https://ko-fi.com/U6U81LHU8)
 
