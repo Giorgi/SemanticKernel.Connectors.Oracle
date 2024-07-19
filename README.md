@@ -1,3 +1,22 @@
 # SemanticKernel.Connectors.Oracle
 
 [Semantic Kernel](https://github.com/microsoft/semantic-kernel) memory built on top of Oracle. Requires [Oracle Database 23ai](https://www.oracle.com/database/23ai/#ai-ml)
+
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/Giorgi/SemanticKernel.Connectors.Oracle/dotnet.yml?branch=main&logo=GitHub&style=for-the-badge)](https://github.com/Giorgi/SemanticKernel.Connectors.Oracle/actions/workflows/dotnet.yml)
+[![License](https://img.shields.io/badge/License-Mit-blue.svg?style=for-the-badge&logo=mit)](LICENSE.md)
+[![Ko-Fi](https://img.shields.io/static/v1?style=for-the-badge&message=Support%20the%20Project&color=success&logo=ko-fi&label=$$)](https://ko-fi.com/U6U81LHU8)
+
+![Project Icon](https://raw.githubusercontent.com/Giorgi/SemanticKernel.Connectors.Oracle/main/SemanticKernel.Connectors.Oracle/Logo.png "SemanticKernel.Connectors.Oracle Project Icon")
+
+## Usage
+
+```sh
+dotnet add package SemanticKernel.Connectors.Oracle
+```
+
+```cs
+var memoryWithOracle = new MemoryBuilder()
+    .WithOpenAITextEmbeddingGeneration("text-embedding-3-small", "your-api-key")
+    .WithMemoryStore(new OracleMemoryStore("Your-Oracle-Connection-String", 1536))
+    .Build();
+```
