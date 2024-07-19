@@ -27,13 +27,12 @@ jobs:
     - name: Test
       env:
         SK_ConnectionString: ${{ secrets.SK_ConnectionString }}
-      run: dotnet test --no-build --verbosity normal --collect:"XPlat Code Coverage;Format=lcov"
+      run: dotnet test --no-build --verbosity normal GitHubActions /p:CollectCoverage=true /p:CoverletOutputFormat=lcov
     - name: Coveralls GitHub Action
       uses: coverallsapp/github-action@v2.3.0
       with: 
         github-token: ${{ secrets.github_token }}
         format: lcov
-        file: SemanticKernel.Connectors.Oracle/SemanticKernel.Connectors.Oracle/SemanticKernel.Connectors.Oracle.Test/TestResults/*/coverage.info
         debug: true
         fail-on-error: true
                   
