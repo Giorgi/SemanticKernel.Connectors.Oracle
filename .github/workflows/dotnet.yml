@@ -27,4 +27,4 @@ jobs:
     - name: Test
       env: # Or as an environment variable
         SK_ConnectionString: ${{ secrets.SK_ConnectionString }}
-      run: dotnet test --no-build --verbosity normal --configuration Release
+      run: dotnet test --no-build --verbosity normal --collect:"XPlat Code Coverage;Format=lcov"
