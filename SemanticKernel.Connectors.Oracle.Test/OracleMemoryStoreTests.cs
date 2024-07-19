@@ -19,11 +19,8 @@ public class OracleMemoryStoreTests : IDisposable
     static OracleMemoryStoreTests()
     {
         var builder = new ConfigurationBuilder()
-               .AddEnvironmentVariables("SK_")
-#if DEBUG
-               .AddJsonFile($"testsettings.json", optional: true)
-#endif
-            ;
+            .AddJsonFile($"testsettings.json", optional: true)
+            .AddEnvironmentVariables("SK_");
 
         var configurationRoot = builder.Build();
 
