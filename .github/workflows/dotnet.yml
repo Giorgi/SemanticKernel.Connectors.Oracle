@@ -23,7 +23,7 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
     - name: Build
-      run: dotnet build --no-restore --configuration Release
+      run: dotnet build --no-restore
     - name: Test
       env: # Or as an environment variable
         SK_ConnectionString: ${{ secrets.SK_ConnectionString }}
