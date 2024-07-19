@@ -18,22 +18,14 @@ public class OracleMemoryStoreTests : IDisposable
 
     static OracleMemoryStoreTests()
     {
-        var builder = new ConfigurationBuilder()
-            .AddJsonFile($"testsettings.json", optional: true)
-            .AddEnvironmentVariables("SK_");
-
-        var configurationRoot = builder.Build();
+        var configurationRoot = new ConfigurationBuilder()
+                                    .AddJsonFile($"testsettings.json", optional: true)
+                                    .AddEnvironmentVariables("SK_")
+                                    .Build();
 
         var connectionString = configurationRoot["ConnectionString"];
 
-        if (string.IsNullOrEmpty(connectionString))
-        {
-            throw new InvalidOperationException("Connection String not initialized");
-        }
-        else
-        {
-            ConnectionString = connectionString;
-        }
+        ConnectionString = !string.IsNullOrEmpty(connectionString) ? connectionString : throw new InvalidOperationException("Connection String not initialized");
     }
 
     [Fact]
