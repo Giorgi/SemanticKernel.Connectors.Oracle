@@ -25,6 +25,11 @@ jobs:
     - name: Build
       run: dotnet build --no-restore
     - name: Test
-      env: # Or as an environment variable
+      env:
         SK_ConnectionString: ${{ secrets.SK_ConnectionString }}
       run: dotnet test --no-build --verbosity normal --collect:"XPlat Code Coverage;Format=lcov"
+    - name: Coveralls GitHub Action
+      uses: coverallsapp/github-action@v2.3.0
+      with: 
+        github-token: ${{ secrets.github_token }}
+                  
