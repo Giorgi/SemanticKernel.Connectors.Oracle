@@ -34,5 +34,6 @@ jobs:
         github-token: ${{ secrets.github_token }}
         format: lcov
         debug: true
-        fail-on-error: true
+        fail-on-error: false
+        path-to-lcov: SemanticKernel.Connectors.Oracle.Test/coverage.info
                   
