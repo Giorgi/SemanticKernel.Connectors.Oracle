@@ -7,6 +7,8 @@
 [![License](https://img.shields.io/badge/License-Mit-blue.svg?style=for-the-badge&logo=mit)](LICENSE.md)
 [![Ko-Fi](https://img.shields.io/static/v1?style=for-the-badge&message=Support%20the%20Project&color=success&logo=ko-fi&label=$$)](https://ko-fi.com/U6U81LHU8)
 
+[![NuGet SemanticKernel.Connectors.Oracle](https://img.shields.io/nuget/dt/SemanticKernel.Connectors.Oracle.svg?label=SemanticKernel.Connectors.Oracle&style=for-the-badge&logo=NuGet)](https://www.nuget.org/packages/SemanticKernel.Connectors.Oracle/)
+
 ![Project Icon](https://raw.githubusercontent.com/Giorgi/SemanticKernel.Connectors.Oracle/main/SemanticKernel.Connectors.Oracle/Logo.png "SemanticKernel.Connectors.Oracle Project Icon")
 
 ## Usage
